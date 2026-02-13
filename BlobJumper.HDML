@@ -1,0 +1,1121 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blob Jumper</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
+    
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+    }
+    
+    .game-font {
+      font-family: 'Bangers', cursive;
+    }
+    
+    @keyframes blob-wobble {
+      0%, 100% { border-radius: 50% 50% 50% 50%; }
+      25% { border-radius: 60% 40% 55% 45%; }
+      50% { border-radius: 45% 55% 40% 60%; }
+      75% { border-radius: 55% 45% 60% 40%; }
+    }
+    
+    .blob {
+      animation: blob-wobble 0.4s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    
+    .float {
+      animation: float 2s ease-in-out infinite;
+    }
+
+    @keyframes damage-flash {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .damage-flash {
+      animation: damage-flash 0.3s ease-in-out;
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full">
+  <div id="game-container" class="relative w-full h-full overflow-hidden" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);"><!-- Game Canvas -->
+   <canvas id="game-canvas" class="absolute inset-0 w-full h-full"></canvas><!-- UI Overlay -->
+   <div class="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none z-10">
+    <div class="bg-black/50 backdrop-blur-sm rounded-xl px-4 py-2">
+     <h1 id="game-title" class="game-font text-3xl text-white tracking-wide" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">🎮 Blob Jumper</h1>
+    </div>
+    <div class="bg-black/50 backdrop-blur-sm rounded-xl px-4 py-2">
+     <p class="game-font text-lg text-yellow-300">WASD to Move</p>
+     <p class="game-font text-sm text-cyan-300">Space = Jump</p>
+    </div>
+   </div><!-- Health Bar -->
+   <div class="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none z-10">
+    <div class="bg-black/50 backdrop-blur-sm rounded-xl px-6 py-3">
+     <p class="game-font text-sm text-white mb-2">Health:</p>
+     <div class="flex gap-2">
+      <div id="health-1" class="w-8 h-8 rounded-full bg-emerald-500 border-2 border-emerald-300"></div>
+      <div id="health-2" class="w-8 h-8 rounded-full bg-emerald-500 border-2 border-emerald-300"></div>
+      <div id="health-3" class="w-8 h-8 rounded-full bg-emerald-500 border-2 border-emerald-300"></div>
+     </div>
+    </div>
+   </div><!-- Win Screen -->
+   <div id="win-screen" class="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-20 hidden">
+    <div class="text-center">
+     <div class="text-8xl mb-4">
+      🎉
+     </div>
+     <h2 id="win-message" class="game-font text-5xl text-yellow-300 mb-4" style="text-shadow: 3px 3px 6px rgba(0,0,0,0.8);">You Win!</h2>
+     <p class="game-font text-2xl text-white mb-6">The blob reached the goal!</p><button id="restart-btn" class="game-font text-2xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white px-8 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg pointer-events-auto"> 🔄 Play Again </button>
+    </div>
+   </div><!-- Game Over Screen -->
+   <div id="game-over-screen" class="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-20 hidden">
+    <div class="text-center">
+     <div class="text-8xl mb-4">
+      💥
+     </div>
+     <h2 class="game-font text-5xl text-red-400 mb-4" style="text-shadow: 3px 3px 6px rgba(0,0,0,0.8);">Game Over!</h2>
+     <p class="game-font text-2xl text-white mb-6">The blob was defeated!</p><button id="restart-btn-2" class="game-font text-2xl bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-400 hover:to-pink-500 text-white px-8 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg pointer-events-auto"> 🔄 Try Again </button>
+    </div>
+   </div><!-- Start Screen -->
+   <div id="start-screen" class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-20">
+    <div class="text-center">
+     <div class="text-8xl mb-4 float">
+      🫧
+     </div>
+     <h2 class="game-font text-5xl text-cyan-300 mb-2" style="text-shadow: 3px 3px 6px rgba(0,0,0,0.8);">Blob Jumper</h2>
+     <p class="game-font text-xl text-white mb-6">Avoid obstacles and reach the flag!</p>
+     <div class="bg-black/40 rounded-xl px-6 py-4 mb-6 inline-block">
+      <p class="game-font text-lg text-yellow-300">Controls:</p>
+      <p class="text-white">W / Space = Jump</p>
+      <p class="text-white">A = Left</p>
+      <p class="text-white">D = Right</p>
+      <p class="text-white mt-2 text-sm text-gray-300">You have 3 hearts! Avoid TWO trolls and spikes!</p>
+     </div><br><button id="start-btn" class="game-font text-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-8 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg pointer-events-auto"> 🚀 Start Game </button>
+    </div>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      game_title: '🎮 Blob Jumper',
+      win_message: 'You Win!',
+      primary_color: '#06b6d4',
+      secondary_color: '#1e293b',
+      text_color: '#ffffff',
+      accent_color: '#fbbf24',
+      platform_color: '#10b981'
+    };
+
+    let config = { ...defaultConfig };
+    let gameStarted = false;
+    let gameWon = false;
+    let gameOver = false;
+
+    // Game variables
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let blob = {
+      x: 50,
+      y: 0,
+      width: 40,
+      height: 40,
+      velocityX: 0,
+      velocityY: 0,
+      onGround: false,
+      health: 3,
+      maxHealth: 3,
+      invulnerable: false,
+      invulnerableTimer: 0
+    };
+    
+    const gravity = 0.6;
+    const jumpForce = -14;
+    const moveSpeed = 5;
+    const friction = 0.85;
+    
+    let platforms = [];
+    let obstacles = [];
+    let troll = null;
+    let troll2 = null;
+    let trollPlatform = null;
+    let trollPlatform2 = null;
+    let goal = { x: 0, y: 0, width: 60, height: 80 };
+    let keys = { w: false, a: false, s: false, d: false, space: false };
+    let cameraX = 0;
+    let animationFrame = 0;
+    
+    function resizeCanvas() {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      generateLevel();
+    }
+    
+    function generateLevel() {
+      platforms = [];
+      obstacles = [];
+      
+      // Starting platform
+      platforms.push({ x: 0, y: canvas.height - 40, width: 250, height: 40 });
+      
+      // Generate platforms with obstacles
+      let lastX = 200;
+      let lastY = canvas.height - 40;
+      let trollPlatformX = 0;
+      let trollPlatformY = 0;
+      let trollPlatform2X = 0;
+      let trollPlatform2Y = 0;
+      
+      for (let i = 0; i < 25; i++) {
+        const gap = 80 + Math.random() * 100;
+        const heightChange = (Math.random() - 0.5) * 100;
+        
+        lastX += gap + 100;
+        lastY = Math.max(150, Math.min(canvas.height - 100, lastY + heightChange));
+        
+        const platformWidth = 160 + Math.random() * 100;
+        platforms.push({
+          x: lastX,
+          y: lastY,
+          width: platformWidth,
+          height: 25
+        });
+        
+        // Place first troll around middle of course
+        if (i === 8) {
+          trollPlatformX = lastX + platformWidth / 2;
+          trollPlatformY = lastY - 60;
+          trollPlatform = {
+            x: lastX,
+            y: lastY,
+            width: platformWidth,
+            height: 25
+          };
+        }
+        
+        // Place second troll later in the course
+        if (i === 18) {
+          trollPlatform2X = lastX + platformWidth / 2;
+          trollPlatform2Y = lastY - 60;
+          trollPlatform2 = {
+            x: lastX,
+            y: lastY,
+            width: platformWidth,
+            height: 25
+          };
+        }
+        
+        // Add obstacles to some platforms (skip troll platforms)
+        if (i !== 8 && i !== 18) {
+          const obstacleType = Math.random();
+          const obstacleX = lastX + platformWidth / 2;
+          
+          if (obstacleType < 0.4) {
+            // Spike obstacle
+            obstacles.push({
+              type: 'spike',
+              x: obstacleX,
+              y: lastY - 25,
+              width: 20,
+              height: 30,
+              platformIndex: platforms.length - 1
+            });
+          } else if (obstacleType < 0.7) {
+            // Spinning blade
+            obstacles.push({
+              type: 'blade',
+              x: obstacleX,
+              y: lastY - 20,
+              radius: 15,
+              rotation: 0,
+              angularVelocity: 0.15,
+              platformIndex: platforms.length - 1
+            });
+          } else if (obstacleType < 0.95) {
+            // Moving obstacle
+            obstacles.push({
+              type: 'moving',
+              x: lastX + 15,
+              y: lastY - 25,
+              width: 25,
+              height: 20,
+              minX: lastX,
+              maxX: lastX + platformWidth - 25,
+              speed: 2,
+              platformIndex: platforms.length - 1
+            });
+          }
+        }
+      }
+      
+      // Goal platform
+      platforms.push({
+        x: lastX + 150,
+        y: lastY - 20,
+        width: 180,
+        height: 40
+      });
+      
+      // Goal flag position
+      goal.x = lastX + 200;
+      goal.y = lastY - 100;
+      
+      // Initialize first troll
+      troll = {
+        x: trollPlatformX,
+        y: trollPlatformY,
+        width: 40,
+        height: 60,
+        clubAngle: 0,
+        clubSwinging: false,
+        swingCounter: 0,
+        animationCounter: 0,
+        direction: 1,
+        patrolMinX: trollPlatform.x + 40,
+        patrolMaxX: trollPlatform.x + trollPlatform.width - 40,
+        speed: 1.5,
+        isChasing: false,
+        sightRange: 300,
+        walkCycle: 0,
+        facingDirection: 1
+      };
+
+      // Initialize second troll
+      troll2 = {
+        x: trollPlatform2X,
+        y: trollPlatform2Y,
+        width: 40,
+        height: 60,
+        clubAngle: 0,
+        clubSwinging: false,
+        swingCounter: 0,
+        animationCounter: 0,
+        direction: 1,
+        patrolMinX: trollPlatform2.x + 40,
+        patrolMaxX: trollPlatform2.x + trollPlatform2.width - 40,
+        speed: 1.5,
+        isChasing: false,
+        sightRange: 300,
+        walkCycle: 0,
+        facingDirection: 1
+      };
+      
+      // Reset blob position
+      blob.x = 100;
+      blob.y = canvas.height - 100;
+      blob.velocityX = 0;
+      blob.velocityY = 0;
+      blob.health = 3;
+      blob.invulnerable = false;
+      blob.invulnerableTimer = 0;
+      cameraX = 0;
+      updateHealthDisplay();
+    }
+    
+    function updateHealthDisplay() {
+      for (let i = 1; i <= 3; i++) {
+        const healthElement = document.getElementById(`health-${i}`);
+        if (i <= blob.health) {
+          healthElement.classList.remove('opacity-20');
+          healthElement.style.backgroundColor = '#10b981';
+        } else {
+          healthElement.classList.add('opacity-20');
+          healthElement.style.backgroundColor = '#6b7280';
+        }
+      }
+    }
+
+    function takeDamage() {
+      if (blob.invulnerable) return;
+      
+      blob.health--;
+      blob.invulnerable = true;
+      blob.invulnerableTimer = 120; // 2 seconds of invulnerability
+      updateHealthDisplay();
+
+      // Flash effect
+      canvas.classList.add('damage-flash');
+      setTimeout(() => canvas.classList.remove('damage-flash'), 300);
+
+      if (blob.health <= 0) {
+        gameOver = true;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+      }
+    }
+    
+    function updateTroll(trollObj) {
+      if (!trollObj) return;
+      
+      // Check if blob is in sight range
+      const distToBlob = Math.abs((blob.x + blob.width / 2) - trollObj.x);
+      const blobAbove = blob.y < trollObj.y;
+      
+      if (distToBlob < trollObj.sightRange && blobAbove) {
+        trollObj.isChasing = true;
+      } else if (distToBlob > trollObj.sightRange + 100) {
+        trollObj.isChasing = false;
+      }
+      
+      // Move troll - confined to patrol area
+      if (trollObj.isChasing) {
+        // Chase the blob within confined area
+        const targetX = blob.x + blob.width / 2;
+        if (targetX > trollObj.x) {
+          trollObj.x = Math.min(trollObj.x + trollObj.speed * 1.5, trollObj.patrolMaxX);
+          trollObj.facingDirection = 1;
+        } else {
+          trollObj.x = Math.max(trollObj.x - trollObj.speed * 1.5, trollObj.patrolMinX);
+          trollObj.facingDirection = -1;
+        }
+        
+        // Attack when close enough
+        if (distToBlob < 80) {
+          if (!trollObj.clubSwinging) {
+            trollObj.clubSwinging = true;
+            trollObj.swingCounter = 0;
+          }
+        }
+      } else {
+        // Patrol back and forth within confined area
+        trollObj.x += trollObj.direction * trollObj.speed;
+        trollObj.facingDirection = trollObj.direction;
+        
+        if (trollObj.x <= trollObj.patrolMinX) {
+          trollObj.direction = 1;
+        } else if (trollObj.x >= trollObj.patrolMaxX) {
+          trollObj.direction = -1;
+        }
+      }
+      
+      // Update swing animation
+      if (trollObj.clubSwinging) {
+        trollObj.swingCounter++;
+        if (trollObj.swingCounter > 40) {
+          trollObj.clubSwinging = false;
+        }
+      }
+      
+      // Update club angle
+      if (trollObj.clubSwinging) {
+        const swingProgress = trollObj.swingCounter / 40;
+        trollObj.clubAngle = Math.sin(swingProgress * Math.PI) * 1.5;
+      } else {
+        trollObj.clubAngle = 0;
+      }
+      
+      // Update walk cycle
+      trollObj.walkCycle += 0.1;
+    }
+    
+    function drawBlob() {
+      const screenX = blob.x - cameraX;
+      const wobble = Math.sin(animationFrame * 0.2) * 3;
+      
+      ctx.save();
+      
+      // Invulnerability flash
+      if (blob.invulnerable && Math.floor(animationFrame / 10) % 2 === 0) {
+        ctx.globalAlpha = 0.5;
+      }
+      
+      ctx.translate(screenX + blob.width / 2, blob.y + blob.height / 2);
+      
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(0, blob.height / 2 + 5, blob.width / 2, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Blob body
+      const gradient = ctx.createRadialGradient(-10, -10, 0, 0, 0, blob.width);
+      gradient.addColorStop(0, '#67e8f9');
+      gradient.addColorStop(0.5, config.primary_color);
+      gradient.addColorStop(1, '#0891b2');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.ellipse(0, wobble, blob.width / 2 + Math.sin(animationFrame * 0.15) * 3, blob.height / 2 + Math.cos(animationFrame * 0.15) * 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Shine
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.beginPath();
+      ctx.ellipse(-8, -8 + wobble, 8, 6, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Eyes
+      const eyeOffsetX = blob.velocityX * 0.5;
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.ellipse(-8 + eyeOffsetX, -5 + wobble, 7, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(8 + eyeOffsetX, -5 + wobble, 7, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Pupils
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.ellipse(-6 + eyeOffsetX, -4 + wobble, 4, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(10 + eyeOffsetX, -4 + wobble, 4, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Eye shine
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.arc(-4 + eyeOffsetX, -6 + wobble, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(12 + eyeOffsetX, -6 + wobble, 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Mouth
+      ctx.strokeStyle = '#0e7490';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      if (blob.velocityY < -2) {
+        ctx.arc(0, 5 + wobble, 6, 0, Math.PI);
+      } else {
+        ctx.arc(0, 8 + wobble, 8, 0.1, Math.PI - 0.1);
+      }
+      ctx.stroke();
+      
+      ctx.restore();
+    }
+    
+    function drawTroll(trollObj) {
+      if (!trollObj) return;
+      
+      const screenX = trollObj.x - cameraX;
+      const screenY = trollObj.y;
+      
+      ctx.save();
+      
+      // Flip troll if facing left
+      if (trollObj.facingDirection === -1) {
+        ctx.translate(screenX * 2, 0);
+        ctx.scale(-1, 1);
+      }
+      
+      // Troll shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(screenX, screenY + trollObj.height + 8, trollObj.width / 2 + 10, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Troll body - green
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.roundRect(screenX - trollObj.width / 2, screenY + 20, trollObj.width, 35, 6);
+      ctx.fill();
+      
+      ctx.strokeStyle = '#16a34a';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Troll head
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.arc(screenX, screenY + 15, 18, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.strokeStyle = '#16a34a';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Head detail - horns
+      ctx.fillStyle = '#6b7280';
+      ctx.beginPath();
+      ctx.moveTo(screenX - 12, screenY - 5);
+      ctx.lineTo(screenX - 18, screenY - 18);
+      ctx.lineTo(screenX - 8, screenY - 8);
+      ctx.closePath();
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.moveTo(screenX + 12, screenY - 5);
+      ctx.lineTo(screenX + 18, screenY - 18);
+      ctx.lineTo(screenX + 8, screenY - 8);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Eyes - angry, glowing if chasing
+      if (trollObj.isChasing) {
+        ctx.fillStyle = '#ef4444';
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 10;
+      } else {
+        ctx.fillStyle = '#000';
+        ctx.shadowColor = 'transparent';
+      }
+      
+      ctx.beginPath();
+      ctx.arc(screenX - 8, screenY + 12, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(screenX + 8, screenY + 12, 5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Eye glow
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(screenX - 8, screenY + 12, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(screenX + 8, screenY + 12, 3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.shadowColor = 'transparent';
+      
+      // Nose
+      ctx.fillStyle = '#059669';
+      ctx.beginPath();
+      ctx.arc(screenX, screenY + 20, 3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Mouth - angry grin
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY + 25, 8, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+      
+      // Troll arms with walk animation
+      const leftArmBob = Math.sin(trollObj.walkCycle) * 3;
+      const rightArmBob = Math.sin(trollObj.walkCycle + Math.PI) * 3;
+      
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.ellipse(screenX - 25, screenY + 30 + leftArmBob, 8, 20, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.ellipse(screenX + 25, screenY + 30 + rightArmBob, 8, 20, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Troll legs with walk animation
+      const leftLegBob = Math.sin(trollObj.walkCycle) * 2;
+      const rightLegBob = Math.sin(trollObj.walkCycle + Math.PI) * 2;
+      
+      ctx.fillStyle = '#16a34a';
+      ctx.beginPath();
+      ctx.ellipse(screenX - 10, screenY + 60 + leftLegBob, 6, 15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.ellipse(screenX + 10, screenY + 60 + rightLegBob, 6, 15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Club - brown wood
+      const clubBaseX = screenX + 25;
+      const clubBaseY = screenY + 30 + rightArmBob;
+      
+      ctx.save();
+      ctx.translate(clubBaseX, clubBaseY);
+      ctx.rotate(trollObj.clubAngle);
+      
+      // Club handle
+      ctx.fillStyle = '#8B4513';
+      ctx.fillRect(-3, 0, 6, 35);
+      
+      ctx.strokeStyle = '#654321';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-3, 0, 6, 35);
+      
+      // Club head - spiky ball
+      ctx.fillStyle = '#A0522D';
+      ctx.beginPath();
+      ctx.arc(0, 42, 12, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.strokeStyle = '#8B4513';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Club spikes
+      for (let i = 0; i < 8; i++) {
+        const angle = (Math.PI * 2 / 8) * i;
+        const spikeX = Math.cos(angle) * 15;
+        const spikeY = Math.sin(angle) * 15 + 42;
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.arc(spikeX, spikeY, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      ctx.restore();
+      ctx.restore();
+    }
+    
+    function drawPlatforms() {
+      platforms.forEach((platform, index) => {
+        const screenX = platform.x - cameraX;
+        
+        if (screenX > -platform.width && screenX < canvas.width + platform.width) {
+          // Platform shadow
+          ctx.fillStyle = 'rgba(0,0,0,0.3)';
+          ctx.fillRect(screenX + 5, platform.y + 5, platform.width, platform.height);
+          
+          // Platform gradient
+          const gradient = ctx.createLinearGradient(screenX, platform.y, screenX, platform.y + platform.height);
+          gradient.addColorStop(0, '#34d399');
+          gradient.addColorStop(0.5, config.platform_color);
+          gradient.addColorStop(1, '#059669');
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.roundRect(screenX, platform.y, platform.width, platform.height, 8);
+          ctx.fill();
+          
+          // Platform shine
+          ctx.fillStyle = 'rgba(255,255,255,0.3)';
+          ctx.beginPath();
+          ctx.roundRect(screenX + 5, platform.y + 3, platform.width - 10, 6, 3);
+          ctx.fill();
+          
+          // Grass tufts
+          ctx.fillStyle = '#22c55e';
+          for (let i = 0; i < platform.width; i += 20) {
+            const grassHeight = 8 + Math.sin(i + animationFrame * 0.1) * 3;
+            ctx.beginPath();
+            ctx.moveTo(screenX + i + 10, platform.y);
+            ctx.lineTo(screenX + i + 13, platform.y - grassHeight);
+            ctx.lineTo(screenX + i + 16, platform.y);
+            ctx.fill();
+          }
+        }
+      });
+    }
+    
+    function drawObstacles() {
+      obstacles.forEach(obstacle => {
+        if (obstacle.type === 'spike') {
+          const screenX = obstacle.x - cameraX;
+          
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.moveTo(screenX, obstacle.y + obstacle.height);
+          ctx.lineTo(screenX + obstacle.width / 2, obstacle.y);
+          ctx.lineTo(screenX + obstacle.width, obstacle.y + obstacle.height);
+          ctx.fill();
+          
+          ctx.strokeStyle = '#dc2626';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(screenX, obstacle.y + obstacle.height);
+          ctx.lineTo(screenX + obstacle.width / 2, obstacle.y);
+          ctx.lineTo(screenX + obstacle.width, obstacle.y + obstacle.height);
+          ctx.stroke();
+          
+          // Spike shine
+          ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(screenX + 3, obstacle.y + obstacle.height - 5);
+          ctx.lineTo(screenX + obstacle.width / 2 - 2, obstacle.y + 3);
+          ctx.stroke();
+        } 
+        else if (obstacle.type === 'blade') {
+          const screenX = obstacle.x - cameraX;
+          const screenY = obstacle.y;
+          
+          // Update rotation
+          obstacle.rotation += obstacle.angularVelocity;
+          
+          ctx.save();
+          ctx.translate(screenX, screenY);
+          ctx.rotate(obstacle.rotation);
+          
+          // Blade center circle
+          ctx.fillStyle = '#fbbf24';
+          ctx.beginPath();
+          ctx.arc(0, 0, 7, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Blade arms - 3 spinning blades
+          for (let i = 0; i < 3; i++) {
+            ctx.save();
+            ctx.rotate((Math.PI * 2 / 3) * i);
+            
+            // Blade shape
+            ctx.fillStyle = '#f97316';
+            ctx.beginPath();
+            ctx.moveTo(-4, 5);
+            ctx.lineTo(4, 5);
+            ctx.lineTo(3, obstacle.radius);
+            ctx.lineTo(-3, obstacle.radius);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Blade shine
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, 8);
+            ctx.lineTo(0, obstacle.radius - 2);
+            ctx.stroke();
+            
+            ctx.restore();
+          }
+          
+          ctx.restore();
+        }
+        else if (obstacle.type === 'moving') {
+          const screenX = obstacle.x - cameraX;
+          
+          // Update position
+          obstacle.x += obstacle.speed;
+          if (obstacle.x > obstacle.maxX || obstacle.x < obstacle.minX) {
+            obstacle.speed *= -1;
+          }
+          
+          // Draw moving obstacle
+          ctx.fillStyle = '#f97316';
+          ctx.beginPath();
+          ctx.roundRect(screenX, obstacle.y, obstacle.width, obstacle.height, 4);
+          ctx.fill();
+          
+          ctx.strokeStyle = '#ea580c';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Pattern
+          ctx.fillStyle = 'rgba(255,255,255,0.3)';
+          for (let i = 0; i < 3; i++) {
+            ctx.fillRect(screenX + 3 + i * 7, obstacle.y + 3, 4, 4);
+          }
+        }
+      });
+    }
+    
+    function drawGoal() {
+      const screenX = goal.x - cameraX;
+      const flagWave = Math.sin(animationFrame * 0.1) * 5;
+      
+      // Pole
+      ctx.fillStyle = '#78716c';
+      ctx.fillRect(screenX, goal.y, 6, goal.height);
+      
+      // Flag
+      ctx.fillStyle = config.accent_color;
+      ctx.beginPath();
+      ctx.moveTo(screenX + 6, goal.y);
+      ctx.lineTo(screenX + 50 + flagWave, goal.y + 20);
+      ctx.lineTo(screenX + 6, goal.y + 40);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Star on flag
+      ctx.fillStyle = 'white';
+      ctx.font = '20px sans-serif';
+      ctx.fillText('⭐', screenX + 18 + flagWave * 0.5, goal.y + 28);
+      
+      // Sparkles
+      const sparklePositions = [
+        { x: screenX + 30, y: goal.y - 10 },
+        { x: screenX + 55, y: goal.y + 25 },
+        { x: screenX + 40, y: goal.y + 50 }
+      ];
+      
+      sparklePositions.forEach((pos, i) => {
+        const sparkleSize = 3 + Math.sin(animationFrame * 0.15 + i) * 2;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.sin(animationFrame * 0.2 + i) * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, sparkleSize, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+    
+    function checkTrollCollision(trollObj) {
+      if (!trollObj || !trollObj.clubSwinging) return;
+      
+      // Calculate club tip position
+      const clubTipX = trollObj.x + (trollObj.facingDirection === 1 ? 25 : -25) + Math.sin(trollObj.clubAngle) * 42;
+      const clubTipY = trollObj.y + 30 + Math.cos(trollObj.clubAngle) * 42;
+      const clubHeadRadius = 12;
+      
+      // Check distance to blob
+      const dist = Math.hypot(
+        (blob.x + blob.width / 2) - clubTipX,
+        (blob.y + blob.height / 2) - clubTipY
+      );
+      
+      if (dist < blob.width / 2 + clubHeadRadius) {
+        takeDamage();
+      }
+    }
+    
+    function checkObstacleCollision() {
+      obstacles.forEach(obstacle => {
+        if (obstacle.type === 'spike') {
+          if (blob.x + blob.width > obstacle.x &&
+              blob.x < obstacle.x + obstacle.width &&
+              blob.y + blob.height > obstacle.y &&
+              blob.y < obstacle.y + obstacle.height) {
+            takeDamage();
+          }
+        }
+        else if (obstacle.type === 'blade') {
+          const dist = Math.hypot(
+            (blob.x + blob.width / 2) - obstacle.x,
+            (blob.y + blob.height / 2) - obstacle.y
+          );
+          if (dist < blob.width / 2 + obstacle.radius + 5) {
+            takeDamage();
+          }
+        }
+        else if (obstacle.type === 'moving') {
+          if (blob.x + blob.width > obstacle.x &&
+              blob.x < obstacle.x + obstacle.width &&
+              blob.y + blob.height > obstacle.y &&
+              blob.y < obstacle.y + obstacle.height) {
+            takeDamage();
+          }
+        }
+      });
+    }
+    
+    function update() {
+      if (!gameStarted || gameWon || gameOver) return;
+      
+      animationFrame++;
+      
+      // Update invulnerability timer
+      if (blob.invulnerable) {
+        blob.invulnerableTimer--;
+        if (blob.invulnerableTimer <= 0) {
+          blob.invulnerable = false;
+        }
+      }
+      
+      // Input handling
+      if (keys.a) blob.velocityX -= moveSpeed * 0.3;
+      if (keys.d) blob.velocityX += moveSpeed * 0.3;
+      if ((keys.w || keys.space) && blob.onGround) {
+        blob.velocityY = jumpForce;
+        blob.onGround = false;
+      }
+      
+      // Apply physics
+      blob.velocityX *= friction;
+      blob.velocityY += gravity;
+      
+      // Limit velocity
+      blob.velocityX = Math.max(-10, Math.min(10, blob.velocityX));
+      blob.velocityY = Math.max(-20, Math.min(20, blob.velocityY));
+      
+      // Move blob
+      blob.x += blob.velocityX;
+      blob.y += blob.velocityY;
+      
+      // Platform collision
+      blob.onGround = false;
+      platforms.forEach(platform => {
+        if (blob.x + blob.width > platform.x &&
+            blob.x < platform.x + platform.width &&
+            blob.y + blob.height > platform.y &&
+            blob.y + blob.height < platform.y + platform.height + 20 &&
+            blob.velocityY >= 0) {
+          blob.y = platform.y - blob.height;
+          blob.velocityY = 0;
+          blob.onGround = true;
+        }
+      });
+      
+      // Update both trolls
+      updateTroll(troll);
+      updateTroll(troll2);
+      
+      // Troll collisions
+      checkTrollCollision(troll);
+      checkTrollCollision(troll2);
+      
+      // Obstacle collision
+      checkObstacleCollision();
+      
+      // Check goal collision
+      if (blob.x + blob.width > goal.x &&
+          blob.x < goal.x + goal.width &&
+          blob.y + blob.height > goal.y &&
+          blob.y < goal.y + goal.height) {
+        gameWon = true;
+        document.getElementById('win-screen').classList.remove('hidden');
+      }
+      
+      // Reset if fallen
+      if (blob.y > canvas.height + 100) {
+        takeDamage();
+        if (blob.health > 0) {
+          blob.x = 100;
+          blob.y = canvas.height - 100;
+          blob.velocityX = 0;
+          blob.velocityY = 0;
+          cameraX = 0;
+          if (troll) {
+            troll.isChasing = false;
+            troll.clubSwinging = false;
+          }
+          if (troll2) {
+            troll2.isChasing = false;
+            troll2.clubSwinging = false;
+          }
+        }
+      }
+      
+      // Camera follow
+      const targetCameraX = blob.x - canvas.width / 3;
+      cameraX += (targetCameraX - cameraX) * 0.1;
+      cameraX = Math.max(0, cameraX);
+    }
+    
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw background particles
+      for (let i = 0; i < 20; i++) {
+        const x = ((i * 150 + animationFrame * 0.5) % (canvas.width + 200)) - 100;
+        const y = Math.sin(i + animationFrame * 0.02) * 50 + canvas.height / 2;
+        const size = 2 + Math.sin(i * 0.5 + animationFrame * 0.05) * 2;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.1 + Math.sin(i + animationFrame * 0.03) * 0.05})`;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      drawPlatforms();
+      drawObstacles();
+      drawTroll(troll);
+      drawTroll(troll2);
+      drawGoal();
+      drawBlob();
+    }
+    
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+    
+    // Event listeners
+    document.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (key === 'w') keys.w = true;
+      if (key === 'a') keys.a = true;
+      if (key === 's') keys.s = true;
+      if (key === 'd') keys.d = true;
+      if (key === ' ') { keys.space = true; e.preventDefault(); }
+    });
+    
+    document.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (key === 'w') keys.w = false;
+      if (key === 'a') keys.a = false;
+      if (key === 's') keys.s = false;
+      if (key === 'd') keys.d = false;
+      if (key === ' ') keys.space = false;
+    });
+    
+    document.getElementById('start-btn').addEventListener('click', () => {
+      document.getElementById('start-screen').classList.add('hidden');
+      gameStarted = true;
+    });
+    
+    document.getElementById('restart-btn').addEventListener('click', () => {
+      document.getElementById('win-screen').classList.add('hidden');
+      gameWon = false;
+      gameOver = false;
+      generateLevel();
+      gameStarted = true;
+    });
+
+    document.getElementById('restart-btn-2').addEventListener('click', () => {
+      document.getElementById('game-over-screen').classList.add('hidden');
+      gameWon = false;
+      gameOver = false;
+      generateLevel();
+      gameStarted = true;
+    });
+    
+    window.addEventListener('resize', resizeCanvas);
+    
+    // SDK Integration
+    async function onConfigChange(newConfig) {
+      config = { ...defaultConfig, ...newConfig };
+      document.getElementById('game-title').textContent = config.game_title;
+      document.getElementById('win-message').textContent = config.win_message;
+    }
+
+    function mapToCapabilities(cfg) {
+      return {
+        recolorables: [
+          {
+            get: () => cfg.primary_color || defaultConfig.primary_color,
+            set: (value) => { cfg.primary_color = value; window.elementSdk.setConfig({ primary_color: value }); }
+          },
+          {
+            get: () => cfg.secondary_color || defaultConfig.secondary_color,
+            set: (value) => { cfg.secondary_color = value; window.elementSdk.setConfig({ secondary_color: value }); }
+          },
+          {
+            get: () => cfg.text_color || defaultConfig.text_color,
+            set: (value) => { cfg.text_color = value; window.elementSdk.setConfig({ text_color: value }); }
+          },
+          {
+            get: () => cfg.accent_color || defaultConfig.accent_color,
+            set: (value) => { cfg.accent_color = value; window.elementSdk.setConfig({ accent_color: value }); }
+          },
+          {
+            get: () => cfg.platform_color || defaultConfig.platform_color,
+            set: (value) => { cfg.platform_color = value; window.elementSdk.setConfig({ platform_color: value }); }
+          }
+        ],
+        borderables: [],
+        fontEditable: undefined,
+        fontSizeable: undefined
+      };
+    }
+
+    function mapToEditPanelValues(cfg) {
+      return new Map([
+        ['game_title', cfg.game_title || defaultConfig.game_title],
+        ['win_message', cfg.win_message || defaultConfig.win_message]
+      ]);
+    }
+
+    // Initialize
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities,
+        mapToEditPanelValues
+      });
+      config = { ...defaultConfig, ...window.elementSdk.config };
+    }
+    
+    resizeCanvas();
+    onConfigChange(config);
+    gameLoop();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd7c5adc2f67539',t:'MTc3MTAyMTg0Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
